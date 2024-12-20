@@ -66,6 +66,13 @@ func main() {
 		}
 	}
 
+	// Check if namespace exists
+	_, err = clientset.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
+	if err != nil {
+		fmt.Printf("Error: namespace '%s' not found\n", namespace)
+		os.Exit(1)
+	}
+
 	// Build and display resource tree
 	tree := buildResourceTree(clientset, namespace)
 	printTree(tree, "", true)

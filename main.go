@@ -138,6 +138,148 @@ func buildResourceTree(clientset *kubernetes.Clientset, namespace string) *Resou
 		}
 	}
 
+	// Get StatefulSets
+	statefulSets, err := clientset.AppsV1().StatefulSets(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err == nil {
+		for _, sts := range statefulSets.Items {
+			stsNode := &Resource{
+				Kind: "StatefulSet",
+				Name: sts.Name,
+				Children: make([]*Resource, 0),
+			}
+			root.Children = append(root.Children, stsNode)
+
+			// Get Pods owned by this StatefulSet
+			pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+			if err == nil {
+				for _, pod := range pods.Items {
+					for _, podOwner := range pod.OwnerReferences {
+						if podOwner.Kind == "StatefulSet" && podOwner.Name == sts.Name {
+							podNode := &Resource{
+								Kind: "Pod",
+								Name: pod.Name,
+								Children: make([]*Resource, 0),
+							}
+							stsNode.Children = append(stsNode.Children, podNode)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Get DaemonSets
+	daemonSets, err := clientset.AppsV1().DaemonSets(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err == nil {
+		for _, ds := range daemonSets.Items {
+			dsNode := &Resource{
+				Kind: "DaemonSet",
+				Name: ds.Name,
+				Children: make([]*Resource, 0),
+			}
+			root.Children = append(root.Children, dsNode)
+
+			// Get Pods owned by this DaemonSet
+			pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+			if err == nil {
+				for _, pod := range pods.Items {
+					for _, podOwner := range pod.OwnerReferences {
+						if podOwner.Kind == "DaemonSet" && podOwner.Name == ds.Name {
+							podNode := &Resource{
+								Kind: "Pod",
+								Name: pod.Name,
+								Children: make([]*Resource, 0),
+							}
+							dsNode.Children = append(dsNode.Children, podNode)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Get Jobs
+	jobs, err := clientset.BatchV1().Jobs(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err == nil {
+		for _, job := range jobs.Items {
+			// Skip jobs owned by CronJobs (they'll be added as children of CronJobs)
+			if len(job.OwnerReferences) > 0 && job.OwnerReferences[0].Kind == "CronJob" {
+				continue
+			}
+			
+			jobNode := &Resource{
+				Kind: "Job",
+				Name: job.Name,
+				Children: make([]*Resource, 0),
+			}
+			root.Children = append(root.Children, jobNode)
+
+			// Get Pods owned by this Job
+			pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+			if err == nil {
+				for _, pod := range pods.Items {
+					for _, podOwner := range pod.OwnerReferences {
+						if podOwner.Kind == "Job" && podOwner.Name == job.Name {
+							podNode := &Resource{
+								Kind: "Pod",
+								Name: pod.Name,
+								Children: make([]*Resource, 0),
+							}
+							jobNode.Children = append(jobNode.Children, podNode)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Get CronJobs
+	cronJobs, err := clientset.BatchV1().CronJobs(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err == nil {
+		for _, cronJob := range cronJobs.Items {
+			cronJobNode := &Resource{
+				Kind: "CronJob",
+				Name: cronJob.Name,
+				Children: make([]*Resource, 0),
+			}
+			root.Children = append(root.Children, cronJobNode)
+
+			// Get Jobs owned by this CronJob
+			jobs, err := clientset.BatchV1().Jobs(namespace).List(context.TODO(), metav1.ListOptions{})
+			if err == nil {
+				for _, job := range jobs.Items {
+					for _, jobOwner := range job.OwnerReferences {
+						if jobOwner.Kind == "CronJob" && jobOwner.Name == cronJob.Name {
+							jobNode := &Resource{
+								Kind: "Job",
+								Name: job.Name,
+								Children: make([]*Resource, 0),
+							}
+							cronJobNode.Children = append(cronJobNode.Children, jobNode)
+
+							// Get Pods owned by this Job
+							pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+							if err == nil {
+								for _, pod := range pods.Items {
+									for _, podOwner := range pod.OwnerReferences {
+										if podOwner.Kind == "Job" && podOwner.Name == job.Name {
+											podNode := &Resource{
+												Kind: "Pod",
+												Name: pod.Name,
+												Children: make([]*Resource, 0),
+											}
+											jobNode.Children = append(jobNode.Children, podNode)
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Get Services
 	services, err := clientset.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err == nil {
@@ -177,6 +319,21 @@ func buildResourceTree(clientset *kubernetes.Clientset, namespace string) *Resou
 					Children: make([]*Resource, 0),
 				}
 				root.Children = append(root.Children, secretNode)
+			}
+		}
+	}
+
+	// Get PersistentVolumeClaims
+	pvcs, err := clientset.CoreV1().PersistentVolumeClaims(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err == nil {
+		for _, pvc := range pvcs.Items {
+			if len(pvc.OwnerReferences) == 0 {
+				pvcNode := &Resource{
+					Kind: "PersistentVolumeClaim",
+					Name: pvc.Name,
+					Children: make([]*Resource, 0),
+				}
+				root.Children = append(root.Children, pvcNode)
 			}
 		}
 	}

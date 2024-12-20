@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -85,10 +86,147 @@ func getCurrentNamespace(kubeconfig string) (string, error) {
 }
 
 func buildResourceTree(clientset *kubernetes.Clientset, namespace string) *Resource {
+	// First, load all resources into memory to avoid multiple API calls
+	services, _ := clientset.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{})
+	configMaps, _ := clientset.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{})
+	secrets, _ := clientset.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{})
+	pvcs, _ := clientset.CoreV1().PersistentVolumeClaims(namespace).List(context.TODO(), metav1.ListOptions{})
+
 	root := &Resource{
 		Kind: "Namespace",
 		Name: namespace,
 		Children: make([]*Resource, 0),
+	}
+
+	// Helper function to find related resources
+	addRelatedResources := func(pod *corev1.Pod, nodeToAttachTo *Resource) {
+		// Track what we've added to avoid duplicates
+		added := make(map[string]bool)
+
+		// Check volumes
+		for _, vol := range pod.Spec.Volumes {
+			// Check ConfigMaps
+			if vol.ConfigMap != nil {
+				key := fmt.Sprintf("ConfigMap/%s", vol.ConfigMap.Name)
+				if !added[key] {
+					for _, cm := range configMaps.Items {
+						if cm.Name == vol.ConfigMap.Name {
+							cmNode := &Resource{
+								Kind: "ConfigMap",
+								Name: cm.Name,
+								Children: make([]*Resource, 0),
+							}
+							nodeToAttachTo.Children = append(nodeToAttachTo.Children, cmNode)
+							added[key] = true
+							break
+						}
+					}
+				}
+			}
+
+			// Check Secrets
+			if vol.Secret != nil {
+				key := fmt.Sprintf("Secret/%s", vol.Secret.SecretName)
+				if !added[key] {
+					for _, secret := range secrets.Items {
+						if secret.Name == vol.Secret.SecretName {
+							secretNode := &Resource{
+								Kind: "Secret",
+								Name: secret.Name,
+								Children: make([]*Resource, 0),
+							}
+							nodeToAttachTo.Children = append(nodeToAttachTo.Children, secretNode)
+							added[key] = true
+							break
+						}
+					}
+				}
+			}
+
+			// Check PVCs
+			if vol.PersistentVolumeClaim != nil {
+				key := fmt.Sprintf("PVC/%s", vol.PersistentVolumeClaim.ClaimName)
+				if !added[key] {
+					for _, pvc := range pvcs.Items {
+						if pvc.Name == vol.PersistentVolumeClaim.ClaimName {
+							pvcNode := &Resource{
+								Kind: "PersistentVolumeClaim",
+								Name: pvc.Name,
+								Children: make([]*Resource, 0),
+							}
+							nodeToAttachTo.Children = append(nodeToAttachTo.Children, pvcNode)
+							added[key] = true
+							break
+						}
+					}
+				}
+			}
+		}
+
+		// Check environment variables
+		for _, container := range pod.Spec.Containers {
+			for _, env := range container.EnvFrom {
+				if env.ConfigMapRef != nil {
+					key := fmt.Sprintf("ConfigMap/%s", env.ConfigMapRef.Name)
+					if !added[key] {
+						for _, cm := range configMaps.Items {
+							if cm.Name == env.ConfigMapRef.Name {
+								cmNode := &Resource{
+									Kind: "ConfigMap",
+									Name: cm.Name,
+									Children: make([]*Resource, 0),
+								}
+								nodeToAttachTo.Children = append(nodeToAttachTo.Children, cmNode)
+								added[key] = true
+								break
+							}
+						}
+					}
+				}
+				if env.SecretRef != nil {
+					key := fmt.Sprintf("Secret/%s", env.SecretRef.Name)
+					if !added[key] {
+						for _, secret := range secrets.Items {
+							if secret.Name == env.SecretRef.Name {
+								secretNode := &Resource{
+									Kind: "Secret",
+									Name: secret.Name,
+									Children: make([]*Resource, 0),
+								}
+								nodeToAttachTo.Children = append(nodeToAttachTo.Children, secretNode)
+								added[key] = true
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Check services that target this pod
+		for _, svc := range services.Items {
+			if svc.Spec.Selector != nil {
+				matches := true
+				for key, value := range svc.Spec.Selector {
+					if pod.Labels[key] != value {
+						matches = false
+						break
+					}
+				}
+				if matches {
+					key := fmt.Sprintf("Service/%s", svc.Name)
+					if !added[key] {
+						svcNode := &Resource{
+							Kind: "Service",
+							Name: svc.Name,
+							Children: make([]*Resource, 0),
+						}
+						nodeToAttachTo.Children = append(nodeToAttachTo.Children, svcNode)
+						added[key] = true
+					}
+				}
+			}
+		}
 	}
 
 	// Get deployments
@@ -115,7 +253,7 @@ func buildResourceTree(clientset *kubernetes.Clientset, namespace string) *Resou
 							}
 							depNode.Children = append(depNode.Children, rsNode)
 
-							// Get Pods owned by this ReplicaSet
+							// Get Pods and their related resources
 							pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
 							if err == nil {
 								for _, pod := range pods.Items {
@@ -127,6 +265,7 @@ func buildResourceTree(clientset *kubernetes.Clientset, namespace string) *Resou
 												Children: make([]*Resource, 0),
 											}
 											rsNode.Children = append(rsNode.Children, podNode)
+											addRelatedResources(&pod, depNode)
 										}
 									}
 								}
@@ -276,64 +415,6 @@ func buildResourceTree(clientset *kubernetes.Clientset, namespace string) *Resou
 						}
 					}
 				}
-			}
-		}
-	}
-
-	// Get Services
-	services, err := clientset.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err == nil {
-		for _, svc := range services.Items {
-			svcNode := &Resource{
-				Kind: "Service",
-				Name: svc.Name,
-				Children: make([]*Resource, 0),
-			}
-			root.Children = append(root.Children, svcNode)
-		}
-	}
-
-	// Get ConfigMaps
-	configMaps, err := clientset.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err == nil {
-		for _, cm := range configMaps.Items {
-			if len(cm.OwnerReferences) == 0 {
-				cmNode := &Resource{
-					Kind: "ConfigMap",
-					Name: cm.Name,
-					Children: make([]*Resource, 0),
-				}
-				root.Children = append(root.Children, cmNode)
-			}
-		}
-	}
-
-	// Get Secrets
-	secrets, err := clientset.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err == nil {
-		for _, secret := range secrets.Items {
-			if len(secret.OwnerReferences) == 0 {
-				secretNode := &Resource{
-					Kind: "Secret",
-					Name: secret.Name,
-					Children: make([]*Resource, 0),
-				}
-				root.Children = append(root.Children, secretNode)
-			}
-		}
-	}
-
-	// Get PersistentVolumeClaims
-	pvcs, err := clientset.CoreV1().PersistentVolumeClaims(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err == nil {
-		for _, pvc := range pvcs.Items {
-			if len(pvc.OwnerReferences) == 0 {
-				pvcNode := &Resource{
-					Kind: "PersistentVolumeClaim",
-					Name: pvc.Name,
-					Children: make([]*Resource, 0),
-				}
-				root.Children = append(root.Children, pvcNode)
 			}
 		}
 	}

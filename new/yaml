@@ -1,0 +1,210 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"annotations":{},"labels":{"app.kubernetes.io/component":"primary","app.kubernetes.io/instance":"gitea","app.kubernetes.io/managed-by":"Helm","app.kubernetes.io/name":"postgresql","app.kubernetes.io/version":"16.3.0","helm.sh/chart":"postgresql-15.5.20"},"name":"gitea-postgresql","namespace":"gitea"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/component":"primary","app.kubernetes.io/instance":"gitea","app.kubernetes.io/name":"postgresql"}},"serviceName":"gitea-postgresql-hl","template":{"metadata":{"labels":{"app.kubernetes.io/component":"primary","app.kubernetes.io/instance":"gitea","app.kubernetes.io/managed-by":"Helm","app.kubernetes.io/name":"postgresql","app.kubernetes.io/version":"16.3.0","helm.sh/chart":"postgresql-15.5.20"},"name":"gitea-postgresql"},"spec":{"affinity":{"nodeAffinity":null,"podAffinity":null,"podAntiAffinity":{"preferredDuringSchedulingIgnoredDuringExecution":[{"podAffinityTerm":{"labelSelector":{"matchLabels":{"app.kubernetes.io/component":"primary","app.kubernetes.io/instance":"gitea","app.kubernetes.io/name":"postgresql"}},"topologyKey":"kubernetes.io/hostname"},"weight":1}]}},"automountServiceAccountToken":false,"containers":[{"env":[{"name":"BITNAMI_DEBUG","value":"false"},{"name":"POSTGRESQL_PORT_NUMBER","value":"5432"},{"name":"POSTGRESQL_VOLUME_DIR","value":"/bitnami/postgresql"},{"name":"PGDATA","value":"/bitnami/postgresql/data"},{"name":"POSTGRES_USER","value":"gitea"},{"name":"POSTGRES_PASSWORD","valueFrom":{"secretKeyRef":{"key":"password","name":"gitea-postgresql"}}},{"name":"POSTGRES_POSTGRES_PASSWORD","valueFrom":{"secretKeyRef":{"key":"postgres-password","name":"gitea-postgresql"}}},{"name":"POSTGRES_DATABASE","value":"gitea"},{"name":"POSTGRESQL_ENABLE_LDAP","value":"no"},{"name":"POSTGRESQL_ENABLE_TLS","value":"no"},{"name":"POSTGRESQL_LOG_HOSTNAME","value":"false"},{"name":"POSTGRESQL_LOG_CONNECTIONS","value":"false"},{"name":"POSTGRESQL_LOG_DISCONNECTIONS","value":"false"},{"name":"POSTGRESQL_PGAUDIT_LOG_CATALOG","value":"off"},{"name":"POSTGRESQL_CLIENT_MIN_MESSAGES","value":"error"},{"name":"POSTGRESQL_SHARED_PRELOAD_LIBRARIES","value":"pgaudit"}],"image":"docker.io/bitnami/postgresql:16.3.0-debian-12-r23","imagePullPolicy":"IfNotPresent","livenessProbe":{"exec":{"command":["/bin/sh","-c","exec pg_isready -U \"gitea\" -d \"dbname=gitea\" -h 127.0.0.1 -p 5432"]},"failureThreshold":6,"initialDelaySeconds":30,"periodSeconds":10,"successThreshold":1,"timeoutSeconds":5},"name":"postgresql","ports":[{"containerPort":5432,"name":"tcp-postgresql"}],"readinessProbe":{"exec":{"command":["/bin/sh","-c","-e","exec pg_isready -U \"gitea\" -d \"dbname=gitea\" -h 127.0.0.1 -p 5432\n[ -f /opt/bitnami/postgresql/tmp/.initialized ] || [ -f /bitnami/postgresql/.initialized ]\n"]},"failureThreshold":6,"initialDelaySeconds":5,"periodSeconds":10,"successThreshold":1,"timeoutSeconds":5},"resources":{"limits":{"cpu":"150m","ephemeral-storage":"2Gi","memory":"192Mi"},"requests":{"cpu":"100m","ephemeral-storage":"50Mi","memory":"128Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"privileged":false,"readOnlyRootFilesystem":true,"runAsGroup":1001,"runAsNonRoot":true,"runAsUser":1001,"seLinuxOptions":{},"seccompProfile":{"type":"RuntimeDefault"}},"volumeMounts":[{"mountPath":"/tmp","name":"empty-dir","subPath":"tmp-dir"},{"mountPath":"/opt/bitnami/postgresql/conf","name":"empty-dir","subPath":"app-conf-dir"},{"mountPath":"/opt/bitnami/postgresql/tmp","name":"empty-dir","subPath":"app-tmp-dir"},{"mountPath":"/dev/shm","name":"dshm"},{"mountPath":"/bitnami/postgresql","name":"data"}]}],"hostIPC":false,"hostNetwork":false,"securityContext":{"fsGroup":1001,"fsGroupChangePolicy":"Always","supplementalGroups":[],"sysctls":[]},"serviceAccountName":"gitea-postgresql","volumes":[{"emptyDir":{},"name":"empty-dir"},{"emptyDir":{"medium":"Memory"},"name":"dshm"}]}},"updateStrategy":{"rollingUpdate":{},"type":"RollingUpdate"},"volumeClaimTemplates":[{"apiVersion":"v1","kind":"PersistentVolumeClaim","metadata":{"name":"data"},"spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"10Gi"}}}}]}}
+  creationTimestamp: "2024-12-21T00:30:35Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/component: primary
+    app.kubernetes.io/instance: gitea
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/version: 16.3.0
+    helm.sh/chart: postgresql-15.5.20
+  name: gitea-postgresql
+  namespace: gitea
+  resourceVersion: "53251690"
+  uid: 67431128-d78b-4cbe-8418-d5984dd02a96
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: primary
+      app.kubernetes.io/instance: gitea
+      app.kubernetes.io/name: postgresql
+  serviceName: gitea-postgresql-hl
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/component: primary
+        app.kubernetes.io/instance: gitea
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: postgresql
+        app.kubernetes.io/version: 16.3.0
+        helm.sh/chart: postgresql-15.5.20
+      name: gitea-postgresql
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: primary
+                  app.kubernetes.io/instance: gitea
+                  app.kubernetes.io/name: postgresql
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      automountServiceAccountToken: false
+      containers:
+      - env:
+        - name: BITNAMI_DEBUG
+          value: "false"
+        - name: POSTGRESQL_PORT_NUMBER
+          value: "5432"
+        - name: POSTGRESQL_VOLUME_DIR
+          value: /bitnami/postgresql
+        - name: PGDATA
+          value: /bitnami/postgresql/data
+        - name: POSTGRES_USER
+          value: gitea
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: gitea-postgresql
+        - name: POSTGRES_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: postgres-password
+              name: gitea-postgresql
+        - name: POSTGRES_DATABASE
+          value: gitea
+        - name: POSTGRESQL_ENABLE_LDAP
+          value: "no"
+        - name: POSTGRESQL_ENABLE_TLS
+          value: "no"
+        - name: POSTGRESQL_LOG_HOSTNAME
+          value: "false"
+        - name: POSTGRESQL_LOG_CONNECTIONS
+          value: "false"
+        - name: POSTGRESQL_LOG_DISCONNECTIONS
+          value: "false"
+        - name: POSTGRESQL_PGAUDIT_LOG_CATALOG
+          value: "off"
+        - name: POSTGRESQL_CLIENT_MIN_MESSAGES
+          value: error
+        - name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES
+          value: pgaudit
+        image: docker.io/bitnami/postgresql:16.3.0-debian-12-r23
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - exec pg_isready -U "gitea" -d "dbname=gitea" -h 127.0.0.1 -p 5432
+          failureThreshold: 6
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: postgresql
+        ports:
+        - containerPort: 5432
+          name: tcp-postgresql
+          protocol: TCP
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - -e
+            - |
+              exec pg_isready -U "gitea" -d "dbname=gitea" -h 127.0.0.1 -p 5432
+              [ -f /opt/bitnami/postgresql/tmp/.initialized ] || [ -f /bitnami/postgresql/.initialized ]
+          failureThreshold: 6
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: 150m
+            ephemeral-storage: 2Gi
+            memory: 192Mi
+          requests:
+            cpu: 100m
+            ephemeral-storage: 50Mi
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsGroup: 1001
+          runAsNonRoot: true
+          runAsUser: 1001
+          seLinuxOptions: {}
+          seccompProfile:
+            type: RuntimeDefault
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /tmp
+          name: empty-dir
+          subPath: tmp-dir
+        - mountPath: /opt/bitnami/postgresql/conf
+          name: empty-dir
+          subPath: app-conf-dir
+        - mountPath: /opt/bitnami/postgresql/tmp
+          name: empty-dir
+          subPath: app-tmp-dir
+        - mountPath: /dev/shm
+          name: dshm
+        - mountPath: /bitnami/postgresql
+          name: data
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 1001
+        fsGroupChangePolicy: Always
+      serviceAccount: gitea-postgresql
+      serviceAccountName: gitea-postgresql
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - emptyDir: {}
+        name: empty-dir
+      - emptyDir:
+          medium: Memory
+        name: dshm
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      creationTimestamp: null
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+      volumeMode: Filesystem
+    status:
+      phase: Pending
+status:
+  availableReplicas: 1
+  collisionCount: 0
+  currentReplicas: 1
+  currentRevision: gitea-postgresql-58cbd549f9
+  observedGeneration: 1
+  readyReplicas: 1
+  replicas: 1
+  updateRevision: gitea-postgresql-58cbd549f9
+  updatedReplicas: 1

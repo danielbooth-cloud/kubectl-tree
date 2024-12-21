@@ -195,28 +195,31 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 
 		// Check environment variables
 		for _, container := range podSpec.Containers {
-			for _, env := range container.EnvFrom {
-				if env.ConfigMapRef != nil {
-					key := fmt.Sprintf("%s/ConfigMap/%s", workloadKind, env.ConfigMapRef.Name)
-					if !found[key] {
-						for i, cm := range r.ConfigMaps.Items {
-							if cm.Name == env.ConfigMapRef.Name {
-								configMaps = append(configMaps, &r.ConfigMaps.Items[i])
-								found[key] = true
-								break
+			// Check envFrom
+			for _, envFrom := range container.EnvFrom {
+				if envFrom.SecretRef != nil {
+					for i, secret := range r.Secrets.Items {
+						if secret.Name == envFrom.SecretRef.Name {
+							if debug {
+								fmt.Printf("Debug: Found Secret from envFrom: %s\n", secret.Name)
 							}
+							secrets = append(secrets, &r.Secrets.Items[i])
+							break
 						}
 					}
 				}
-				if env.SecretRef != nil {
-					key := fmt.Sprintf("%s/Secret/%s", workloadKind, env.SecretRef.Name)
-					if !found[key] {
-						for i, secret := range r.Secrets.Items {
-							if secret.Name == env.SecretRef.Name {
-								secrets = append(secrets, &r.Secrets.Items[i])
-								found[key] = true
-								break
+			}
+			
+			// Check individual env variables
+			for _, env := range container.Env {
+				if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
+					for i, secret := range r.Secrets.Items {
+						if secret.Name == env.ValueFrom.SecretKeyRef.Name {
+							if debug {
+								fmt.Printf("Debug: Found Secret from env: %s\n", secret.Name)
 							}
+							secrets = append(secrets, &r.Secrets.Items[i])
+							break
 						}
 					}
 				}

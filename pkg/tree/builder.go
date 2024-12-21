@@ -25,10 +25,20 @@ func NewBuilder(client *k8s.Client, debug bool) *Builder {
 
 // BuildTree builds a tree of resources in the specified namespace
 func (b *Builder) BuildTree(namespace string) (*Resource, error) {
-	// Get all resources
+	// Get all resources in namespace
 	resources, err := b.client.GetResources(namespace)
 	if err != nil {
 		return nil, err
+	}
+
+	// Check if namespace is empty
+	if len(resources.Deployments.Items) == 0 && 
+	   len(resources.StatefulSets.Items) == 0 && 
+	   len(resources.DaemonSets.Items) == 0 && 
+	   len(resources.Jobs.Items) == 0 && 
+	   len(resources.CronJobs.Items) == 0 {
+		fmt.Printf("No resources found in %s namespace.\n", namespace)
+		return nil, nil
 	}
 
 	root := &Resource{

@@ -18,6 +18,7 @@ func main() {
     var kubeconfig *string
     var showVersion bool
     var namespace string
+    var debug bool
 
     if home := homedir.HomeDir(); home != "" {
         kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
@@ -27,6 +28,7 @@ func main() {
 
     flag.BoolVar(&showVersion, "version", false, "show version information")
     flag.StringVar(&namespace, "n", "", "namespace to show tree for (defaults to current namespace)")
+    flag.BoolVar(&debug, "debug", false, "enable debug output")
     flag.Parse()
 
     if showVersion {
@@ -57,7 +59,7 @@ func main() {
     }
 
     // Get the tree
-    root, err := tree.NewBuilder(client).BuildTree(namespace)
+    root, err := tree.NewBuilder(client, debug).BuildTree(namespace)
     if err != nil {
         fmt.Printf("Error building resource tree: %v\n", os.Stderr)
         os.Exit(1)

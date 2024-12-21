@@ -6,9 +6,9 @@ import (
     "os"
     "path/filepath"
 
-    "./k8s"
-    "./tree"
-    "./util"
+    "kubectl-tree/pkg/k8s"
+    "kubectl-tree/pkg/tree"
+    "kubectl-tree/pkg/util"
     "k8s.io/client-go/util/homedir"
 )
 

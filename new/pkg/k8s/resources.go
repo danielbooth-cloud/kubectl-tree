@@ -54,12 +54,11 @@ func (r *Resources) GetJobsByOwner(ownerKind, ownerName string) []*batchv1.Job {
 
 // FindRelatedResources finds all resources related to a workload
 func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1.PodSpec, found map[string]bool, debug bool) ([]*corev1.Service, []*corev1.ConfigMap, []*corev1.Secret, []*corev1.PersistentVolumeClaim) {
-	var (
-		services   []*corev1.Service
-		configMaps []*corev1.ConfigMap
-		secrets    []*corev1.Secret
-		pvcs       []*corev1.PersistentVolumeClaim
-	)
+	// Use maps to deduplicate resources
+	serviceMap := make(map[string]*corev1.Service)
+	configMapMap := make(map[string]*corev1.ConfigMap)
+	secretMap := make(map[string]*corev1.Secret)
+	pvcMap := make(map[string]*corev1.PersistentVolumeClaim)
 
 	workloadLabels := workload.GetLabels()
 	workloadName := workload.GetName()
@@ -80,7 +79,7 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 					if debug {
 						fmt.Printf("Debug: Found StatefulSet VolumeClaimTemplate PVC: %s\n", pvc.Name)
 					}
-					pvcs = append(pvcs, &r.PVCs.Items[i])
+					pvcMap[pvc.Name] = &r.PVCs.Items[i]
 				}
 			}
 		}
@@ -123,7 +122,7 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 		}
 
 		if matches {
-			services = append(services, &r.Services.Items[i])
+			serviceMap[svc.Name] = &r.Services.Items[i]
 		}
 	}
 
@@ -144,7 +143,7 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 			if vol.ConfigMap != nil {
 				for i, cm := range r.ConfigMaps.Items {
 					if cm.Name == vol.ConfigMap.Name {
-						configMaps = append(configMaps, &r.ConfigMaps.Items[i])
+						configMapMap[cm.Name] = &r.ConfigMaps.Items[i]
 						break
 					}
 				}
@@ -153,7 +152,7 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 			if vol.Secret != nil {
 				for i, secret := range r.Secrets.Items {
 					if secret.Name == vol.Secret.SecretName {
-						secrets = append(secrets, &r.Secrets.Items[i])
+						secretMap[secret.Name] = &r.Secrets.Items[i]
 						break
 					}
 				}
@@ -171,7 +170,7 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 						if debug {
 							fmt.Printf("Debug: Found PVC by direct match: %s\n", pvc.Name)
 						}
-						pvcs = append(pvcs, &r.PVCs.Items[i])
+						pvcMap[pvc.Name] = &r.PVCs.Items[i]
 						pvcFound = true
 						break
 					}
@@ -186,7 +185,7 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 								fmt.Printf("Debug: Found StatefulSet PVC: %s for %s\n", 
 									pvc.Name, workloadName)
 							}
-							pvcs = append(pvcs, &r.PVCs.Items[i])
+							pvcMap[pvc.Name] = &r.PVCs.Items[i]
 						}
 					}
 				}
@@ -203,7 +202,7 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 							if debug {
 								fmt.Printf("Debug: Found Secret from envFrom: %s\n", secret.Name)
 							}
-							secrets = append(secrets, &r.Secrets.Items[i])
+							secretMap[secret.Name] = &r.Secrets.Items[i]
 							break
 						}
 					}
@@ -218,13 +217,34 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 							if debug {
 								fmt.Printf("Debug: Found Secret from env: %s\n", secret.Name)
 							}
-							secrets = append(secrets, &r.Secrets.Items[i])
+							secretMap[secret.Name] = &r.Secrets.Items[i]
 							break
 						}
 					}
 				}
 			}
 		}
+	}
+
+	// At the end, convert maps back to slices
+	services := make([]*corev1.Service, 0, len(serviceMap))
+	for _, svc := range serviceMap {
+		services = append(services, svc)
+	}
+
+	configMaps := make([]*corev1.ConfigMap, 0, len(configMapMap))
+	for _, cm := range configMapMap {
+		configMaps = append(configMaps, cm)
+	}
+
+	secrets := make([]*corev1.Secret, 0, len(secretMap))
+	for _, secret := range secretMap {
+		secrets = append(secrets, secret)
+	}
+
+	pvcs := make([]*corev1.PersistentVolumeClaim, 0, len(pvcMap))
+	for _, pvc := range pvcMap {
+		pvcs = append(pvcs, pvc)
 	}
 
 	return services, configMaps, secrets, pvcs

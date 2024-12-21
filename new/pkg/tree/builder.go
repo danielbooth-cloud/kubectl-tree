@@ -203,7 +203,7 @@ func (b *Builder) addRelatedResources(workload metav1.Object, workloadNode *Reso
 	}
 
 	// Find related resources
-	services, configMaps, secrets, pvcs := resources.FindRelatedResources(workload, podSpec, found)
+	services, configMaps, secrets, pvcs := resources.FindRelatedResources(workload, podSpec, found, b.debug)
 	
 	if b.debug {
 		fmt.Printf("Debug: Found resources for %s: secrets=%d, pvcs=%d, configmaps=%d, services=%d\n", 

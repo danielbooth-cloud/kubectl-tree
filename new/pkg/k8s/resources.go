@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -52,7 +53,7 @@ func (r *Resources) GetJobsByOwner(ownerKind, ownerName string) []*batchv1.Job {
 }
 
 // FindRelatedResources finds all resources related to a workload
-func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1.PodSpec, found map[string]bool) ([]*corev1.Service, []*corev1.ConfigMap, []*corev1.Secret, []*corev1.PersistentVolumeClaim) {
+func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1.PodSpec, found map[string]bool, debug bool) ([]*corev1.Service, []*corev1.ConfigMap, []*corev1.Secret, []*corev1.PersistentVolumeClaim) {
 	var (
 		services   []*corev1.Service
 		configMaps []*corev1.ConfigMap
@@ -63,11 +64,26 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 	workloadLabels := workload.GetLabels()
 	workloadName := workload.GetName()
 	
-	// Get workload kind
+	// Get workload kind and check for StatefulSet VolumeClaimTemplates
 	var workloadKind string
-	switch workload.(type) {
+	switch w := workload.(type) {
 	case *appsv1.StatefulSet:
 		workloadKind = "StatefulSet"
+		// Check VolumeClaimTemplates for StatefulSets
+		for _, template := range w.Spec.VolumeClaimTemplates {
+			pvcName := template.Name + "-" + workloadName + "-0"
+			if debug {
+				fmt.Printf("Debug: Looking for StatefulSet VolumeClaimTemplate PVC: %s\n", pvcName)
+			}
+			for i, pvc := range r.PVCs.Items {
+				if pvc.Name == pvcName {
+					if debug {
+						fmt.Printf("Debug: Found StatefulSet VolumeClaimTemplate PVC: %s\n", pvc.Name)
+					}
+					pvcs = append(pvcs, &r.PVCs.Items[i])
+				}
+			}
+		}
 	case *appsv1.Deployment:
 		workloadKind = "Deployment"
 	case *appsv1.DaemonSet:
@@ -113,42 +129,64 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 
 	// Find related resources from volumes and environment
 	if podSpec != nil {
+		if debug {
+			fmt.Printf("Debug: Checking volumes for %s (%s): count=%d\n", 
+				workloadName, workloadKind, len(podSpec.Volumes))
+			// Print all PVCs in namespace for debugging
+			fmt.Printf("Debug: Available PVCs in namespace:\n")
+			for _, pvc := range r.PVCs.Items {
+				fmt.Printf("  - %s\n", pvc.Name)
+			}
+		}
+
 		// Check volumes
 		for _, vol := range podSpec.Volumes {
 			if vol.ConfigMap != nil {
-				key := fmt.Sprintf("%s/ConfigMap/%s", workloadKind, vol.ConfigMap.Name)
-				if !found[key] {
-					for i, cm := range r.ConfigMaps.Items {
-						if cm.Name == vol.ConfigMap.Name {
-							configMaps = append(configMaps, &r.ConfigMaps.Items[i])
-							found[key] = true
-							break
-						}
+				for i, cm := range r.ConfigMaps.Items {
+					if cm.Name == vol.ConfigMap.Name {
+						configMaps = append(configMaps, &r.ConfigMaps.Items[i])
+						break
 					}
 				}
 			}
 
 			if vol.Secret != nil {
-				key := fmt.Sprintf("%s/Secret/%s", workloadKind, vol.Secret.SecretName)
-				if !found[key] {
-					for i, secret := range r.Secrets.Items {
-						if secret.Name == vol.Secret.SecretName {
-							secrets = append(secrets, &r.Secrets.Items[i])
-							found[key] = true
-							break
-						}
+				for i, secret := range r.Secrets.Items {
+					if secret.Name == vol.Secret.SecretName {
+						secrets = append(secrets, &r.Secrets.Items[i])
+						break
 					}
 				}
 			}
 
 			if vol.PersistentVolumeClaim != nil {
-				key := fmt.Sprintf("%s/PVC/%s", workloadKind, vol.PersistentVolumeClaim.ClaimName)
-				if !found[key] {
+				if debug {
+					fmt.Printf("Debug: Checking PVC %s for %s\n", 
+						vol.PersistentVolumeClaim.ClaimName, workloadName)
+				}
+				pvcFound := false
+				for i, pvc := range r.PVCs.Items {
+					// Direct name match
+					if pvc.Name == vol.PersistentVolumeClaim.ClaimName {
+						if debug {
+							fmt.Printf("Debug: Found PVC by direct match: %s\n", pvc.Name)
+						}
+						pvcs = append(pvcs, &r.PVCs.Items[i])
+						pvcFound = true
+						break
+					}
+				}
+
+				// For StatefulSets, also check for PVCs that match the pattern
+				if !pvcFound && workloadKind == "StatefulSet" {
 					for i, pvc := range r.PVCs.Items {
-						if pvc.Name == vol.PersistentVolumeClaim.ClaimName {
+						// Check for common StatefulSet PVC patterns
+						if strings.Contains(pvc.Name, workloadName) {
+							if debug {
+								fmt.Printf("Debug: Found StatefulSet PVC: %s for %s\n", 
+									pvc.Name, workloadName)
+							}
 							pvcs = append(pvcs, &r.PVCs.Items[i])
-							found[key] = true
-							break
 						}
 					}
 				}

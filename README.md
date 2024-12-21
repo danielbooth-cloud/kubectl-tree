@@ -22,6 +22,9 @@ kubectl tree -n istio-system
 - Access to a Kubernetes cluster
 - kubectl installed
 
+1. Download latest release from [releases](https://github.com/danielboothcloud/kubectl-tree/releases)
+2. Move the binary to your PATH, e.g. `/usr/local/bin/kubectl-tree`
+
 ### Building from source
 Requires go 1.21 or higher
 ```

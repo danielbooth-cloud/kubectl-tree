@@ -213,11 +213,12 @@ func (b *Builder) addRelatedResources(workload metav1.Object, workloadNode *Reso
 	// Add Services
 	for _, svc := range services {
 		if b.debug {
-			fmt.Printf("Debug: Adding Service %s to %s\n", svc.Name, workload.GetName())
+			fmt.Printf("\tDebug: Adding Service %s to %s\n", svc.Name, workload.GetName())
 		}
 		svcNode := &Resource{
 			Kind: "Service",
 			Name: svc.Name,
+			
 			Children: make([]*Resource, 0),
 		}
 		workloadNode.Children = append(workloadNode.Children, svcNode)
@@ -226,7 +227,7 @@ func (b *Builder) addRelatedResources(workload metav1.Object, workloadNode *Reso
 	// Add ConfigMaps
 	for _, cm := range configMaps {
 		if b.debug {
-			fmt.Printf("Debug: Adding ConfigMap %s to %s\n", cm.Name, workload.GetName())
+			fmt.Printf("\tDebug: Adding ConfigMap %s to %s\n", cm.Name, workload.GetName())
 		}
 		cmNode := &Resource{
 			Kind: "ConfigMap",
@@ -239,11 +240,11 @@ func (b *Builder) addRelatedResources(workload metav1.Object, workloadNode *Reso
 	// Add Secrets
 	for _, secret := range secrets {
 		if b.debug {
-			fmt.Printf("Debug: Adding Secret %s to %s\n", secret.Name, workload.GetName())
+			fmt.Printf("\tDebug: Adding Secret %s to %s\n", secret.Name, workload.GetName())
 		}
 		secretNode := &Resource{
-			Kind:     "Secret",
-			Name:     secret.Name,
+			Kind: "Secret",
+			Name: secret.Name,
 			Children: make([]*Resource, 0),
 		}
 		workloadNode.Children = append(workloadNode.Children, secretNode)
@@ -252,11 +253,11 @@ func (b *Builder) addRelatedResources(workload metav1.Object, workloadNode *Reso
 	// Add PVCs
 	for _, pvc := range pvcs {
 		if b.debug {
-			fmt.Printf("Debug: Adding PVC %s to %s\n", pvc.Name, workload.GetName())
+			fmt.Printf("\tDebug: Adding PVC %s to %s\n", pvc.Name, workload.GetName())
 		}
 		pvcNode := &Resource{
-			Kind:     "PersistentVolumeClaim",
-			Name:     pvc.Name,
+			Kind: "PersistentVolumeClaim",
+			Name: pvc.Name,
 			Children: make([]*Resource, 0),
 		}
 		workloadNode.Children = append(workloadNode.Children, pvcNode)

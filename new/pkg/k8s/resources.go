@@ -71,14 +71,8 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 		// Check VolumeClaimTemplates for StatefulSets
 		for _, template := range w.Spec.VolumeClaimTemplates {
 			pvcName := template.Name + "-" + workloadName + "-0"
-			if debug {
-				fmt.Printf("Debug: Looking for StatefulSet VolumeClaimTemplate PVC: %s\n", pvcName)
-			}
 			for i, pvc := range r.PVCs.Items {
 				if pvc.Name == pvcName {
-					if debug {
-						fmt.Printf("Debug: Found StatefulSet VolumeClaimTemplate PVC: %s\n", pvc.Name)
-					}
 					pvcMap[pvc.Name] = &r.PVCs.Items[i]
 				}
 			}
@@ -128,15 +122,6 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 
 	// Find related resources from volumes and environment
 	if podSpec != nil {
-		if debug {
-			fmt.Printf("Debug: Checking volumes for %s (%s): count=%d\n", 
-				workloadName, workloadKind, len(podSpec.Volumes))
-			// Print all PVCs in namespace for debugging
-			fmt.Printf("Debug: Available PVCs in namespace:\n")
-			for _, pvc := range r.PVCs.Items {
-				fmt.Printf("  - %s\n", pvc.Name)
-			}
-		}
 
 		// Check volumes
 		for _, vol := range podSpec.Volumes {
@@ -159,17 +144,10 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 			}
 
 			if vol.PersistentVolumeClaim != nil {
-				if debug {
-					fmt.Printf("Debug: Checking PVC %s for %s\n", 
-						vol.PersistentVolumeClaim.ClaimName, workloadName)
-				}
 				pvcFound := false
 				for i, pvc := range r.PVCs.Items {
 					// Direct name match
 					if pvc.Name == vol.PersistentVolumeClaim.ClaimName {
-						if debug {
-							fmt.Printf("Debug: Found PVC by direct match: %s\n", pvc.Name)
-						}
 						pvcMap[pvc.Name] = &r.PVCs.Items[i]
 						pvcFound = true
 						break
@@ -199,9 +177,6 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 				if envFrom.SecretRef != nil {
 					for i, secret := range r.Secrets.Items {
 						if secret.Name == envFrom.SecretRef.Name {
-							if debug {
-								fmt.Printf("Debug: Found Secret from envFrom: %s\n", secret.Name)
-							}
 							secretMap[secret.Name] = &r.Secrets.Items[i]
 							break
 						}
@@ -214,9 +189,6 @@ func (r *Resources) FindRelatedResources(workload metav1.Object, podSpec *corev1
 				if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
 					for i, secret := range r.Secrets.Items {
 						if secret.Name == env.ValueFrom.SecretKeyRef.Name {
-							if debug {
-								fmt.Printf("Debug: Found Secret from env: %s\n", secret.Name)
-							}
 							secretMap[secret.Name] = &r.Secrets.Items[i]
 							break
 						}

@@ -9,6 +9,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 )
 
+const defaultNamespace = "default"
+
 // GetCurrentNamespace returns the current namespace from the kubeconfig context
 func GetCurrentNamespace(kubeconfig string) (string, error) {
 	// If kubeconfig is empty, try to use the default location
@@ -45,7 +47,7 @@ func getCurrentNamespaceFromConfig(config *api.Config) (string, error) {
 	}
 
 	// Default to "default" namespace if none is specified
-	return "default", nil
+	return defaultNamespace, nil
 }
 
 // ValidateNamespace checks if the namespace is valid
@@ -76,7 +78,7 @@ func GetNamespaceOrDefault(namespace, kubeconfig string) (string, error) {
 	// Otherwise, get the current namespace from kubeconfig
 	ns, err := GetCurrentNamespace(kubeconfig)
 	if err != nil {
-		return "default", nil // Fallback to default namespace
+		return defaultNamespace, nil // Fallback to default namespace
 	}
 
 	return ns, nil

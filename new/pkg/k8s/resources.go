@@ -115,32 +115,6 @@ func (r *Resources) FindRelatedResources(workload metav1.Object) (services []*co
 				}
 			}
 		}
-
-		if vol.Secret != nil {
-			key := "Secret/" + vol.Secret.SecretName
-			if !found[key] {
-				for i, secret := range r.Secrets.Items {
-					if secret.Name == vol.Secret.SecretName {
-						secrets = append(secrets, &r.Secrets.Items[i])
-						found[key] = true
-						break
-					}
-				}
-			}
-		}
-
-		if vol.PersistentVolumeClaim != nil {
-			key := "PVC/" + vol.PersistentVolumeClaim.ClaimName
-			if !found[key] {
-				for i, pvc := range r.PVCs.Items {
-					if pvc.Name == vol.PersistentVolumeClaim.ClaimName {
-						pvcs = append(pvcs, &r.PVCs.Items[i])
-						found[key] = true
-						break
-					}
-				}
-			}
-		}
 	}
 
 	// Find related ConfigMaps and Secrets from environment variables

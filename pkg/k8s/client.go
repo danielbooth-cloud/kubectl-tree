@@ -129,3 +129,9 @@ func (c *Client) GetResources(namespace string) (*Resources, error) {
 
 	return resources, nil
 }
+
+// Add this method if it doesn't exist
+// GetPod retrieves a pod by name in the specified namespace
+func (c *Client) GetPod(namespace, name string) (*corev1.Pod, error) {
+    return c.clientset.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+}

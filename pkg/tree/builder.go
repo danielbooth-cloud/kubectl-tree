@@ -79,7 +79,17 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 			    }
 			    rsNode.Children = append(rsNode.Children, podNode)
 			    
-			    // Add containers to the pod
+			    // Add init containers to the pod first
+			    for _, initContainer := range pod.Spec.InitContainers {
+			        initContainerNode := &Resource{
+			            Kind:     "InitContainer",
+			            Name:     initContainer.Name,
+			            Children: make([]*Resource, 0),
+			        }
+			        podNode.Children = append(podNode.Children, initContainerNode)
+			    }
+			    
+			    // Add regular containers to the pod
 			    for _, container := range pod.Spec.Containers {
 			        containerNode := &Resource{
 			            Kind:     "Container",
@@ -109,23 +119,34 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 		b.addRelatedResources(sts, stsNode, resources, found)
 
 		// Add Pods last so they appear after the related resources
+		// For StatefulSets
 		for _, pod := range resources.GetPodsByOwner("StatefulSet", sts.Name) {
-			podNode := &Resource{
-				Kind:     "Pod",
-				Name:     pod.Name,
-				Children: make([]*Resource, 0),
-			}
-			stsNode.Children = append(stsNode.Children, podNode)
-			
-			// Add containers to the pod
-			for _, container := range pod.Spec.Containers {
-				containerNode := &Resource{
-					Kind:     "Container",
-					Name:     container.Name,
-					Children: make([]*Resource, 0),
-				}
-				podNode.Children = append(podNode.Children, containerNode)
-			}
+		    podNode := &Resource{
+		        Kind:     "Pod",
+		        Name:     pod.Name,
+		        Children: make([]*Resource, 0),
+		    }
+		    stsNode.Children = append(stsNode.Children, podNode)
+		    
+		    // Add init containers to the pod first
+		    for _, initContainer := range pod.Spec.InitContainers {
+		        initContainerNode := &Resource{
+		            Kind:     "InitContainer",
+		            Name:     initContainer.Name,
+		            Children: make([]*Resource, 0),
+		        }
+		        podNode.Children = append(podNode.Children, initContainerNode)
+		    }
+		    
+		    // Add regular containers to the pod
+		    for _, container := range pod.Spec.Containers {
+		        containerNode := &Resource{
+		            Kind:     "Container",
+		            Name:     container.Name,
+		            Children: make([]*Resource, 0),
+		        }
+		        podNode.Children = append(podNode.Children, containerNode)
+		    }
 		}
 	}
 
@@ -143,23 +164,34 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 		b.addRelatedResources(ds, dsNode, resources, found)
 
 		// Add Pods
+		// For DaemonSets
 		for _, pod := range resources.GetPodsByOwner("DaemonSet", ds.Name) {
-			podNode := &Resource{
-				Kind:     "Pod",
-				Name:     pod.Name,
-				Children: make([]*Resource, 0),
-			}
-			dsNode.Children = append(dsNode.Children, podNode)
-			
-			// Add containers to the pod
-			for _, container := range pod.Spec.Containers {
-				containerNode := &Resource{
-					Kind:     "Container",
-					Name:     container.Name,
-					Children: make([]*Resource, 0),
-				}
-				podNode.Children = append(podNode.Children, containerNode)
-			}
+		    podNode := &Resource{
+		        Kind:     "Pod",
+		        Name:     pod.Name,
+		        Children: make([]*Resource, 0),
+		    }
+		    dsNode.Children = append(dsNode.Children, podNode)
+		    
+		    // Add init containers to the pod first
+		    for _, initContainer := range pod.Spec.InitContainers {
+		        initContainerNode := &Resource{
+		            Kind:     "InitContainer",
+		            Name:     initContainer.Name,
+		            Children: make([]*Resource, 0),
+		        }
+		        podNode.Children = append(podNode.Children, initContainerNode)
+		    }
+		    
+		    // Add regular containers to the pod
+		    for _, container := range pod.Spec.Containers {
+		        containerNode := &Resource{
+		            Kind:     "Container",
+		            Name:     container.Name,
+		            Children: make([]*Resource, 0),
+		        }
+		        podNode.Children = append(podNode.Children, containerNode)
+		    }
 		}
 	}
 
@@ -187,6 +219,16 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 				jobNode.Children = append(jobNode.Children, podNode)
 				
 				// Add containers to the pod
+				for _, initContainer := range pod.Spec.InitContainers {
+					initContainerNode := &Resource{
+						Kind:     "InitContainer",
+						Name:     initContainer.Name,
+						Children: make([]*Resource, 0),
+					}
+					podNode.Children = append(podNode.Children, initContainerNode)
+				}
+				
+				// Add regular containers to the pod
 				for _, container := range pod.Spec.Containers {
 					containerNode := &Resource{
 						Kind:     "Container",
@@ -228,6 +270,16 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 				jobNode.Children = append(jobNode.Children, podNode)
 				
 				// Add containers to the pod
+				for _, initContainer := range pod.Spec.InitContainers {
+					initContainerNode := &Resource{
+						Kind:     "InitContainer",
+						Name:     initContainer.Name,
+						Children: make([]*Resource, 0),
+					}
+					podNode.Children = append(podNode.Children, initContainerNode)
+				}
+				
+				// Add regular containers to the pod
 				for _, container := range pod.Spec.Containers {
 					containerNode := &Resource{
 						Kind:     "Container",

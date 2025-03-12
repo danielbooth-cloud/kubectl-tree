@@ -8,13 +8,14 @@ A kubectl plugin to visualize Kubernetes resource relationships in a tree-like f
 - Workloads (Deployments, StatefulSets, DaemonSets)
 - Their child resources (ReplicaSets, Pods)
 - Related resources (Services, ConfigMaps, Secrets, PVCs)
+- Containers within Pods (Containers, InitContainers)
 
 ### Examples
 
 ```
 kubectl tree -n istio-system
 ```
-![alt text](<CleanShot 2024-12-21 at 17.39.23.png>)
+![alt text](<CleanShot 2025-03-12 at 22.49.48.png>)
 
 ## Installation
 

@@ -1,49 +1,46 @@
 package tree
 
 import (
+	"fmt"
 	"kubectl-tree/pkg/k8s"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1 "k8s.io/api/core/v1"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
-	"fmt"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Builder handles building the resource tree
 type Builder struct {
-	client *k8s.Client
-	debug  bool
+	client    *k8s.Client
+	debug     bool
+	resources *k8s.Resources // Add this field
 }
 
-// NewBuilder creates a new tree builder
-func NewBuilder(client *k8s.Client, debug bool) *Builder {
-	return &Builder{
-		client: client,
-		debug:  debug,
-	}
-}
-
-// BuildTree builds a tree of resources in the specified namespace
+// Update BuildTree to store resources
 func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 	// Get all resources in namespace
 	resources, err := b.client.GetResources(namespace)
 	if err != nil {
 		return nil, err
 	}
-
+	
+	// Store resources for later use
+	b.resources = resources
+	
 	// Check if namespace is empty
-	if len(resources.Deployments.Items) == 0 && 
-	   len(resources.StatefulSets.Items) == 0 && 
-	   len(resources.DaemonSets.Items) == 0 && 
-	   len(resources.Jobs.Items) == 0 && 
-	   len(resources.CronJobs.Items) == 0 {
+	if len(resources.Deployments.Items) == 0 &&
+		len(resources.StatefulSets.Items) == 0 &&
+		len(resources.DaemonSets.Items) == 0 &&
+		len(resources.Jobs.Items) == 0 &&
+		len(resources.CronJobs.Items) == 0 {
 		fmt.Printf("No resources found in %s namespace.\n", namespace)
 		return nil, nil
 	}
 
 	root := &Resource{
-		Kind: "Namespace",
-		Name: namespace,
+		Kind:     "Namespace",
+		Name:     namespace,
 		Children: make([]*Resource, 0),
 	}
 
@@ -53,10 +50,10 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 	// Add Deployments
 	for i := range resources.Deployments.Items {
 		dep := &resources.Deployments.Items[i]
-		
+
 		depNode := &Resource{
-			Kind: "Deployment",
-			Name: dep.Name,
+			Kind:     "Deployment",
+			Name:     dep.Name,
 			Children: make([]*Resource, 0),
 		}
 		root.Children = append(root.Children, depNode)
@@ -67,21 +64,44 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 		// Add ReplicaSets
 		for _, rs := range resources.GetReplicaSetsByOwner("Deployment", dep.Name) {
 			rsNode := &Resource{
-				Kind: "ReplicaSet",
-				Name: rs.Name,
+				Kind:     "ReplicaSet",
+				Name:     rs.Name,
 				Children: make([]*Resource, 0),
 			}
 			depNode.Children = append(depNode.Children, rsNode)
 
 			// Add Pods
 			for _, pod := range resources.GetPodsByOwner("ReplicaSet", rs.Name) {
-				podNode := &Resource{
-					Kind: "Pod",
-					Name: pod.Name,
-					Children: make([]*Resource, 0),
-				}
-				rsNode.Children = append(rsNode.Children, podNode)
+			    podNode := &Resource{
+			        Kind:     "Pod",
+			        Name:     pod.Name,
+			        Children: make([]*Resource, 0),
+			    }
+			    rsNode.Children = append(rsNode.Children, podNode)
+			    
+			    // Add init containers to the pod first
+			    for _, initContainer := range pod.Spec.InitContainers {
+			        initContainerNode := &Resource{
+			            Kind:     "InitContainer",
+			            Name:     initContainer.Name,
+			            Children: make([]*Resource, 0),
+			        }
+			        podNode.Children = append(podNode.Children, initContainerNode)
+			    }
+			    
+			    // Add regular containers to the pod
+			    for _, container := range pod.Spec.Containers {
+			        containerNode := &Resource{
+			            Kind:     "Container",
+			            Name:     container.Name,
+			            Children: make([]*Resource, 0),
+			        }
+			        podNode.Children = append(podNode.Children, containerNode)
+			    }
 			}
+			
+			// Remove the call to addContainersToTree at the end of BuildTree
+			// b.addContainersToTree(root)
 		}
 	}
 
@@ -89,8 +109,8 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 	for i := range resources.StatefulSets.Items {
 		sts := &resources.StatefulSets.Items[i]
 		stsNode := &Resource{
-			Kind: "StatefulSet",
-			Name: sts.Name,
+			Kind:     "StatefulSet",
+			Name:     sts.Name,
 			Children: make([]*Resource, 0),
 		}
 		root.Children = append(root.Children, stsNode)
@@ -99,13 +119,34 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 		b.addRelatedResources(sts, stsNode, resources, found)
 
 		// Add Pods last so they appear after the related resources
+		// For StatefulSets
 		for _, pod := range resources.GetPodsByOwner("StatefulSet", sts.Name) {
-			podNode := &Resource{
-				Kind: "Pod",
-				Name: pod.Name,
-				Children: make([]*Resource, 0),
-			}
-			stsNode.Children = append(stsNode.Children, podNode)
+		    podNode := &Resource{
+		        Kind:     "Pod",
+		        Name:     pod.Name,
+		        Children: make([]*Resource, 0),
+		    }
+		    stsNode.Children = append(stsNode.Children, podNode)
+		    
+		    // Add init containers to the pod first
+		    for _, initContainer := range pod.Spec.InitContainers {
+		        initContainerNode := &Resource{
+		            Kind:     "InitContainer",
+		            Name:     initContainer.Name,
+		            Children: make([]*Resource, 0),
+		        }
+		        podNode.Children = append(podNode.Children, initContainerNode)
+		    }
+		    
+		    // Add regular containers to the pod
+		    for _, container := range pod.Spec.Containers {
+		        containerNode := &Resource{
+		            Kind:     "Container",
+		            Name:     container.Name,
+		            Children: make([]*Resource, 0),
+		        }
+		        podNode.Children = append(podNode.Children, containerNode)
+		    }
 		}
 	}
 
@@ -113,8 +154,8 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 	for i := range resources.DaemonSets.Items {
 		ds := &resources.DaemonSets.Items[i]
 		dsNode := &Resource{
-			Kind: "DaemonSet",
-			Name: ds.Name,
+			Kind:     "DaemonSet",
+			Name:     ds.Name,
 			Children: make([]*Resource, 0),
 		}
 		root.Children = append(root.Children, dsNode)
@@ -123,13 +164,34 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 		b.addRelatedResources(ds, dsNode, resources, found)
 
 		// Add Pods
+		// For DaemonSets
 		for _, pod := range resources.GetPodsByOwner("DaemonSet", ds.Name) {
-			podNode := &Resource{
-				Kind: "Pod",
-				Name: pod.Name,
-				Children: make([]*Resource, 0),
-			}
-			dsNode.Children = append(dsNode.Children, podNode)
+		    podNode := &Resource{
+		        Kind:     "Pod",
+		        Name:     pod.Name,
+		        Children: make([]*Resource, 0),
+		    }
+		    dsNode.Children = append(dsNode.Children, podNode)
+		    
+		    // Add init containers to the pod first
+		    for _, initContainer := range pod.Spec.InitContainers {
+		        initContainerNode := &Resource{
+		            Kind:     "InitContainer",
+		            Name:     initContainer.Name,
+		            Children: make([]*Resource, 0),
+		        }
+		        podNode.Children = append(podNode.Children, initContainerNode)
+		    }
+		    
+		    // Add regular containers to the pod
+		    for _, container := range pod.Spec.Containers {
+		        containerNode := &Resource{
+		            Kind:     "Container",
+		            Name:     container.Name,
+		            Children: make([]*Resource, 0),
+		        }
+		        podNode.Children = append(podNode.Children, containerNode)
+		    }
 		}
 	}
 
@@ -138,8 +200,8 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 		job := &resources.Jobs.Items[i]
 		if len(job.OwnerReferences) == 0 || job.OwnerReferences[0].Kind != "CronJob" {
 			jobNode := &Resource{
-				Kind: "Job",
-				Name: job.Name,
+				Kind:     "Job",
+				Name:     job.Name,
 				Children: make([]*Resource, 0),
 			}
 			root.Children = append(root.Children, jobNode)
@@ -150,11 +212,31 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 			// Add Pods
 			for _, pod := range resources.GetPodsByOwner("Job", job.Name) {
 				podNode := &Resource{
-					Kind: "Pod",
-					Name: pod.Name,
+					Kind:     "Pod",
+					Name:     pod.Name,
 					Children: make([]*Resource, 0),
 				}
 				jobNode.Children = append(jobNode.Children, podNode)
+				
+				// Add containers to the pod
+				for _, initContainer := range pod.Spec.InitContainers {
+					initContainerNode := &Resource{
+						Kind:     "InitContainer",
+						Name:     initContainer.Name,
+						Children: make([]*Resource, 0),
+					}
+					podNode.Children = append(podNode.Children, initContainerNode)
+				}
+				
+				// Add regular containers to the pod
+				for _, container := range pod.Spec.Containers {
+					containerNode := &Resource{
+						Kind:     "Container",
+						Name:     container.Name,
+						Children: make([]*Resource, 0),
+					}
+					podNode.Children = append(podNode.Children, containerNode)
+				}
 			}
 		}
 	}
@@ -163,8 +245,8 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 	for i := range resources.CronJobs.Items {
 		cronJob := &resources.CronJobs.Items[i]
 		cronJobNode := &Resource{
-			Kind: "CronJob",
-			Name: cronJob.Name,
+			Kind:     "CronJob",
+			Name:     cronJob.Name,
 			Children: make([]*Resource, 0),
 		}
 		root.Children = append(root.Children, cronJobNode)
@@ -172,8 +254,8 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 		// Add Jobs owned by this CronJob
 		for _, job := range resources.GetJobsByOwner("CronJob", cronJob.Name) {
 			jobNode := &Resource{
-				Kind: "Job",
-				Name: job.Name,
+				Kind:     "Job",
+				Name:     job.Name,
 				Children: make([]*Resource, 0),
 			}
 			cronJobNode.Children = append(cronJobNode.Children, jobNode)
@@ -181,16 +263,81 @@ func (b *Builder) BuildTree(namespace string) (*Resource, error) {
 			// Add Pods
 			for _, pod := range resources.GetPodsByOwner("Job", job.Name) {
 				podNode := &Resource{
-					Kind: "Pod",
-					Name: pod.Name,
+					Kind:     "Pod",
+					Name:     pod.Name,
 					Children: make([]*Resource, 0),
 				}
 				jobNode.Children = append(jobNode.Children, podNode)
+				
+				// Add containers to the pod
+				for _, initContainer := range pod.Spec.InitContainers {
+					initContainerNode := &Resource{
+						Kind:     "InitContainer",
+						Name:     initContainer.Name,
+						Children: make([]*Resource, 0),
+					}
+					podNode.Children = append(podNode.Children, initContainerNode)
+				}
+				
+				// Add regular containers to the pod
+				for _, container := range pod.Spec.Containers {
+					containerNode := &Resource{
+						Kind:     "Container",
+						Name:     container.Name,
+						Children: make([]*Resource, 0),
+					}
+					podNode.Children = append(podNode.Children, containerNode)
+				}
 			}
 		}
 	}
 
+	// Remove this line to prevent adding containers twice
+	// b.addContainersToTree(root)
+
 	return root, nil
+}
+
+// New method to add containers to pods in the tree
+// Fix the addContainersToTree method to use Resource instead of node
+// Fix the addContainersToTree method to properly handle errors and use the correct parameters
+func (b *Builder) addContainersToTree(node *Resource) {
+    // Skip if node is nil
+    if node == nil {
+        return
+    }
+    
+    // Process Pod nodes
+    if node.Kind == "Pod" {
+        // Find the pod in the already fetched resources instead of making a new API call
+        for _, child := range node.Children {
+            // Skip if already processed
+            if child.Kind == "Container" {
+                continue
+            }
+        }
+        
+        // Just add containers from the pod spec directly
+        // This is safer than making additional API calls
+        for _, pod := range b.resources.Pods.Items {
+            if pod.Name == node.Name {
+                for _, container := range pod.Spec.Containers {
+                    containerNode := &Resource{
+                        Kind:     "Container",
+                        Name:     container.Name,
+                        Children: make([]*Resource, 0),
+                    }
+                    node.Children = append(node.Children, containerNode)
+                }
+                break
+            }
+        }
+    }
+    
+    // Process children recursively
+    for _, child := range node.Children {
+        b.addContainersToTree(child)
+    }
 }
 
 // addRelatedResources adds related resources as children of the workload node
@@ -214,9 +361,9 @@ func (b *Builder) addRelatedResources(workload metav1.Object, workloadNode *Reso
 
 	// Find related resources
 	services, configMaps, secrets, pvcs := resources.FindRelatedResources(workload, podSpec, found, b.debug)
-	
+
 	if b.debug {
-		fmt.Printf("Debug: Found resources for %s: secrets=%d, pvcs=%d, configmaps=%d, services=%d\n", 
+		fmt.Printf("Debug: Found resources for %s: secrets=%d, pvcs=%d, configmaps=%d, services=%d\n",
 			workload.GetName(), len(secrets), len(pvcs), len(configMaps), len(services))
 	}
 
@@ -228,7 +375,7 @@ func (b *Builder) addRelatedResources(workload metav1.Object, workloadNode *Reso
 		svcNode := &Resource{
 			Kind: "Service",
 			Name: svc.Name,
-			
+
 			Children: make([]*Resource, 0),
 		}
 		workloadNode.Children = append(workloadNode.Children, svcNode)
@@ -240,8 +387,8 @@ func (b *Builder) addRelatedResources(workload metav1.Object, workloadNode *Reso
 			fmt.Printf("\tDebug: Adding ConfigMap %s to %s\n", cm.Name, workload.GetName())
 		}
 		cmNode := &Resource{
-			Kind: "ConfigMap",
-			Name: cm.Name,
+			Kind:     "ConfigMap",
+			Name:     cm.Name,
 			Children: make([]*Resource, 0),
 		}
 		workloadNode.Children = append(workloadNode.Children, cmNode)
@@ -253,8 +400,8 @@ func (b *Builder) addRelatedResources(workload metav1.Object, workloadNode *Reso
 			fmt.Printf("\tDebug: Adding Secret %s to %s\n", secret.Name, workload.GetName())
 		}
 		secretNode := &Resource{
-			Kind: "Secret",
-			Name: secret.Name,
+			Kind:     "Secret",
+			Name:     secret.Name,
 			Children: make([]*Resource, 0),
 		}
 		workloadNode.Children = append(workloadNode.Children, secretNode)
@@ -266,10 +413,19 @@ func (b *Builder) addRelatedResources(workload metav1.Object, workloadNode *Reso
 			fmt.Printf("\tDebug: Adding PVC %s to %s\n", pvc.Name, workload.GetName())
 		}
 		pvcNode := &Resource{
-			Kind: "PersistentVolumeClaim",
-			Name: pvc.Name,
+			Kind:     "PersistentVolumeClaim",
+			Name:     pvc.Name,
 			Children: make([]*Resource, 0),
 		}
 		workloadNode.Children = append(workloadNode.Children, pvcNode)
+	}
+}
+
+// NewBuilder creates a new tree builder
+func NewBuilder(client *k8s.Client, debug bool) *Builder {
+	return &Builder{
+		client:    client,
+		debug:     debug,
+		resources: nil, // Will be set in BuildTree
 	}
 }

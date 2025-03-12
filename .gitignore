@@ -17,3 +17,5 @@ kubectl-tree
 # Go mod files
 go.mod
 go.sum
+
+todo.txt
